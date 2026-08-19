@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Guys Chat</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: sans-serif; background: #efeae2; }
+        
+        /* Login Overlay */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #efeae2; display: flex; align-items: center; justify-content: center; z-index: 999; }
+        .login-card { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 340px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.15); max-height: 90vh; overflow-y: auto; }
+        .login-card h3 { margin-bottom: 15px; color: #075e54; }
+        .login-card input { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; outline: none; }
+        .login-card button { width: 100%; padding: 12px; background: #075e54; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        .error-msg { color: red; font-size: 12px; margin-bottom: 10px; display: none; }
+
+        /* Main Chat UI */
+        #chat-container { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+        header { background: #075e54; color: white; padding: 10px 15px; font-size: 18px; font-weight: bold; text-align: center; flex-shrink: 0; }
+        #messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Message Bubbles */
+        .msg-row { display: flex; align-items: flex-end; gap: 8px; max-width: 75%; }
+        .msg-row.my-msg { margin-left: auto; flex-direction: row-reverse; }
+        .avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #ddd; flex-shrink: 0; }
+        .bubble { background: white; padding: 10px 14px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); word-break: break-word; }
+        .my-msg .bubble { background: #dcf8c6; }
+        .sender-name { font-size: 11px; font-weight: bold; color: #075e54; margin-bottom: 3px; }
+        .my-msg .sender-name { display: none; }
+
+        /* Media */
+        .bubble img, .bubble video { max-width: 200px; border-radius: 6px; display: block; margin-top: 5px; }
+        .bubble audio { max-width: 220px; display: block; margin-top: 5px; }
+
+        /* Footer Input */
+        .chat-footer { background: #f0f0f0; padding: 8px 12px; display: flex; align-items: center; gap: 8px; border-top: 1px solid #ddd; flex-shrink: 0; }
+        .icon-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 5px; color: #555; }
+        .chat-footer input[type="text"] { flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 20px; outline: none; background: white; font-size: 14px; }
+        .send-btn { background: #075e54; color: white; border: none; padding: 8px 14px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        .mic-btn { background: #e51c23; color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .mic-btn.recording { animation: pulse 1s infinite; background: #c62828; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <!-- Login & Profile Setup Screen -->
+    <div id="login-overlay">
+        <div class="login-card">
+            <h3>Family Guys Chat</h3>
+            <div id="step-1">
+                <p style="font-size: 13px; color: #555; margin-bottom: 10px;">အကောင့်ဝင်ရန် Username နှင့် Password ထည့်ပါ။</p>
+                <input type="text" id="username" placeholder="Username (ဥပမာ - user_alpha)">
+                <input type="password" id="password" placeholder="Password">
+                <div id="error-text" class="error-msg">Username သို့မဟုတ် Password မှားယွင်းနေပါသည်။</div>
+                <button onclick="checkLogin()">နောက်တစ်ဆင့်သို့</button>
+            </div>
+            
+            <div id="step-2" style="display: none;">
+                <p style="font-size: 13px; color: #555; margin-bottom: 10px;">ပြသမည့်နာမည်နှင့် Profile ပုံ သတ်မှတ်ပါ</p>
+                <input type="text" id="displayName" placeholder="ပြသမည့်နာမည် (Display Name)">
+                <div style="text-align: left; font-size: 12px; color: #666; margin-bottom: 3px;">Profile ပုံ ရွေးရန်:</div>
+                <input type="file" id="profilePicInput" accept="image/*" style="padding: 3px; border: none;">
+                <button onclick="completeLogin()">Groupထဲသို့ဝင်မည်</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Interface -->
+    <div id="chat-container">
+        <header>Family Guys Group</header>
+        <div id="messages"></div>
+
+        <div class="chat-footer">
+            <label class="icon-btn" title="Profileဓာတ်ပုံတင်ရန်">📁
+                <input type="file" id="mediaInput" accept="image/*,video/*" style="display: none;" onchange="sendFile()">
+            </label>
+            <input type="text" id="msgInput" placeholder="စာရိုက်ရန်..." onkeypress="if(event.key === 'Enter') sendText()">
+            <button id="micBtn" class="mic-btn" onclick="toggleVoiceRecording()" title="အသံဖမ်းရန်">🎤</button>
+            <button class="send-btn" onclick="sendText()">Sent</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let finalName = "";
+        let finalAvatar = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
+        // အာမခံချက်အနေဖြင့် App စဖွင့်ချင်း localStorage ထဲမှာ သိမ်းထားတာ ရှိမရှိ စစ်ဆေးခြင်း
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedName = localStorage.getItem('fg_finalName');
+            const savedAvatar = localStorage.getItem('fg_finalAvatar');
+            if (savedName) {
+                finalName = savedName;
+                if (savedAvatar) finalAvatar = savedAvatar;
+                document.getElementById('login-overlay').style.display = 'none';
+            }
+        });
+
+        // အကောင့် ၁၀ ခု စာရင်း
+        const validAccounts = {
+            "user_alpha": "AlphaPass#2026",
+            "user_beta": "BetaPass#2026",
+            "user_gamma": "GammaPass#2026",
+            "user_delta": "DeltaPass#2026",
+            "user_epsilon": "EpsPass#2026",
+            "user_zeta": "ZetaPass#2026",
+            "user_eta": "EtaPass#2026",
+            "user_theta": "ThetaPass#2026",
+            "user_iota": "IotaPass#2026",
+            "user_kappa": "KappaPass#2026"
+        };
+
+        function checkLogin() {
+            const u = document.getElementById('username').value.trim();
+            const p = document.getElementById('password').value.trim();
+            const errDiv = document.getElementById('error-text');
+
+            if(validAccounts[u] && validAccounts[u] === p) {
+                errDiv.style.display = 'none';
+                document.getElementById('username').value = u;
+                document.getElementById('displayName').value = u;
+                document.getElementById('step-1').style.display = 'none';
+                document.getElementById('step-2').style.display = 'block';
+            } else {
+                errDiv.style.display = 'block';
+            }
+        }
+
+        async function completeLogin() {
+            const name = document.getElementById('displayName').value.trim();
+            const fileInput = document.getElementById('profilePicInput');
+
+            if(!name) {
+                alert("ကျေးဇူးပြု၍ ပြသမည့်နာမည် ထည့်ပါ။");
+                return;
+            }
+
+            finalName = name;
+
+            if(fileInput.files.length > 0) {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                finalAvatar = '/' + data.path;
+            }
+
+            // အချက်အလက်များကို localStorage ထဲမှာ အမြဲမှတ်ထားရန် သိမ်းဆည်းခြင်း
+            localStorage.setItem('fg_finalName', finalName);
+            localStorage.setItem('fg_finalAvatar', finalAvatar);
+
+            document.getElementById('login-overlay').style.display = 'none';
+        }
+
+        async function sendText() {
+            const msgInput = document.getElementById('msgInput');
+            const content = msgInput.value.trim();
+            if(content === "") return;
+
+            socket.emit('chat message', {
+                name: finalName,
+                avatar: finalAvatar,
+                type: 'text',
+                content: content
+            });
+            msgInput.value = '';
+        }
+
+        async function sendFile() {
+            const fileInput = document.getElementById('mediaInput');
+            if(fileInput.files.length === 0) return;
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            const content = '/' + data.path;
+
+            let type = 'text';
+            if(file.type.startsWith('image')) type = 'image';
+            else if(file.type.startsWith('video')) type = 'video';
+
+            socket.emit('chat message', {
+                name: finalName,
+                avatar: finalAvatar,
+                type: type,
+                content: content
+            });
+
+            fileInput.value = '';
+        }
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        async function toggleVoiceRecording() {
+            const micBtn = document.getElementById('micBtn');
+            
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const formData = new FormData();
+                        formData.append('file', audioBlob, 'voice_message.webm');
+
+                        const res = await fetch('/upload', { method: 'POST', body: formData });
+                        const data = await res.json();
+                        const content = '/' + data.path;
+
+                        socket.emit('chat message', {
+                            name: finalName,
+                            avatar: finalAvatar,
+                            type: 'audio',
+                            content: content
+                        });
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    micBtn.classList.add('recording');
+                    micBtn.innerText = "⏫";
+                } catch (err) {
+                    alert("မိုက်ခရိုဖုန်း အသုံးပြုခွင့် ပိတ်ထား거나 အဆင်မပြေဖြစ်နေပါသည်။");
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                micBtn.classList.remove('recording');
+                micBtn.innerText = "🗣️";
+            }
+        }
+
+        socket.on('chat message', (data) => {
+            const messages = document.getElementById('messages');
+            const isMyMsg = data.name === finalName;
+
+            const row = document.createElement('div');
+            row.className = `msg-row ${isMyMsg ? 'my-msg' : ''}`;
+
+            let html = `<img src="${data.avatar}" class="avatar">`;
+            html += `<div class="bubble">`;
+            html += `<div class="sender-name">${data.name}</div>`;
+
+            if(data.type === 'image') {
+                html += `<img src="${data.content}">`;
+            } else if(data.type === 'video') {
+                html += `<video src="${data.content}" controls></video>`;
+            } else if(data.type === 'audio') {
+                html += `<audio src="${data.content}" controls></audio>`;
+            } else {
+                html += `<div>${data.content}</div>`;
+            }
+
+            html += `</div>`;
+            row.innerHTML = html;
+            messages.appendChild(row);
+            messages.scrollTop = messages.scrollHeight;
+        });
+    </script>
+</body>
+</html>
